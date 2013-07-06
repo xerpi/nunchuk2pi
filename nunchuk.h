@@ -23,7 +23,7 @@ struct nunchuk {
 	uint16_t aX, aY, aZ;
 };
 
-
+int nunchuk_init_nunchuk();
 int nunchuk_init();
 int nunchuk_read_data(struct nunchuk* n);
 int nunchuk_exit();

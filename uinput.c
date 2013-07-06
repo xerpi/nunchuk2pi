@@ -73,7 +73,7 @@ int uinput_init()
     //usleep(100);
     
     ui_initiated = 1;
-    
+    printf("uinput initiated\n");
     return 1;	
 }
 

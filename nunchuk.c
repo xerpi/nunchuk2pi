@@ -4,14 +4,13 @@
 
 
 static const char* nunchuk_adapter[] = {
-	"/dev/i2c-0",
 	"/dev/i2c-1",
+	"/dev/i2c-0",
 	NULL
 };
 
 static uint8_t nunchuk_data_buffer[6];
 static struct i2c_rdwr_ioctl_data nunchuk_ioctl_data;
-
 static int nunchuk_fd = -1;
 static int nunchuk_initiated = 0;
 
@@ -21,16 +20,16 @@ static int nunchuk_initiated = 0;
 	}
 
 
-static int nunchuk_init_nunchuk()
+int nunchuk_init_nunchuk()
 {
+	nunchuk_return_not_initiated();
+
 	if( (i2c_smbus_write_byte_data(nunchuk_fd, 0xF0, 0x55) < 0) ||
 		(i2c_smbus_write_byte_data(nunchuk_fd, 0xFB, 0x00) < 0))
 	{
-		printf("error initializing nunchuk (step 1) \n");
-		nunchuk_initiated = 0;
+		printf("error initializing nunchuk\n");
 		return -1;	
 	}
-	nunchuk_initiated = 1;
 	return 1;
 }
 
@@ -38,7 +37,7 @@ static int nunchuk_request_data()
 {
 	nunchuk_return_not_initiated();
 	if(i2c_smbus_write_byte(nunchuk_fd, 0x00) < 0) {
-		printf("error requesting data: smbus_write_byte error\n");
+		printf("error requesting data\n");
 		return -1;
 	}
 	return 1;
@@ -55,24 +54,20 @@ static int nunchuk_parse_data(struct nunchuk* n)
 	n->aZ = (((nunchuk_data_buffer[5]>>6) & 0b11) | ((int)nunchuk_data_buffer[4])<<2);
 }
 
-inline int nunchuk_is_initiated()
-{
-	return nunchuk_initiated;
-}
-
 int nunchuk_init()
 {
 	if(nunchuk_initiated) {
 		return 2;
 	}
 	
-	int i;
-	for(i = 0; nunchuk_adapter[i]; i++) {
+	int i = 0;
+	for(; nunchuk_adapter[i]; i++) {
 		printf("Trying to open %s...", nunchuk_adapter[i]);
-		nunchuk_fd = open(nunchuk_adapter[i], O_RDWR | O_NONBLOCK);
+		nunchuk_fd = open(nunchuk_adapter[i], O_RDWR);
 		if(nunchuk_fd < 0) {
 			printf("error\n");
 		} else {
+			printf("opened!\n");
 			break;
 		}
 	}
@@ -86,9 +81,9 @@ int nunchuk_init()
 	
 	if(ioctl(nunchuk_fd, I2C_SLAVE, NUNCHUK_ADDRESS) < 0) {
 		printf("error with ioctl I2C_SLAVE\n");
-		close(nunchuk_fd);
 		return -1;
 	}
+	
 	//update_period = (1/(float)update_freq) * 1000 * 1000;
 	
 	nunchuk_ioctl_data.msgs = (struct i2c_msg *)malloc(sizeof(struct i2c_msg));
@@ -100,40 +95,37 @@ int nunchuk_init()
 
 	memset(nunchuk_data_buffer, 0, sizeof(uint8_t) * NUNCHUK_DATA_LENGTH);
 	
+	nunchuk_initiated = 1;
 	
 	usleep(100);
-	nunchuk_init_nunchuk();
-	usleep(100);	
-
 	return 1;
 }
 
 
 int nunchuk_read_data(struct nunchuk* n)
 {
-	nunchuk_return_not_initiated();
 	/*ret = i2c_smbus_read_i2c_block_data(fd, 0, NUNCHUK_DATA_LENGTH, (uint8_t *)nunchuk_buffer);
 	if(ret < 0) {
 		printf("error reading data\n");
 	} else {
 		printf("read %d byte(s)!!\n", ret);
 	}*/
+
+	int ret = ioctl(nunchuk_fd, I2C_RDWR, &nunchuk_ioctl_data);
 	
-	
-	if(ioctl(nunchuk_fd, I2C_RDWR, &nunchuk_ioctl_data) < 0) {
-		printf("error I2C_RDWR\n");
+	if(ret < 0) {
+		printf("error reading data I2C_RDWR\n");
 		memset(n, 0, sizeof(struct nunchuk));
 		return -1;
 	} else {
+		nunchuk_request_data();	
 		nunchuk_parse_data(n);
 	}
-	
-	
+
 	/*int i;
 	for(i = 0; i < NUNCHUK_DATA_LENGTH; i++)
 		nunchuk_buffer[i] = i2c_smbus_read_byte(fd);*/
 
-	nunchuk_request_data();
 	return 1;	
 }
 
@@ -146,6 +138,7 @@ int nunchuk_exit()
 	if(nunchuk_fd > 0) {
 		close(nunchuk_fd);
 	}
+	nunchuk_initiated = 0;
 	return 1;
 }
 

@@ -22,17 +22,18 @@ void nunchuk_print_data(struct nunchuk* n);
 int main(int argc, char *argv[])
 {
 	nunchuk2pi_init();
+	nunchuk_init_nunchuk();
 	struct nunchuk n;
 
 	while(1) {
-		if(nunchuk_is_initiated()) {
-			nunchuk_read_data(&n);
+		if(nunchuk_read_data(&n) > 0) {
 			usleep(100);
 			nunchuk_print_data(&n);
-			usleep(100 * 1000);
+			usleep(100);
 		} else {
-			nunchuk_init();
-			usleep(1000 * 1000);
+			while(nunchuk_init_nunchuk() < 0) {
+				usleep(100);
+			}
 		}
 	}
 	
@@ -50,18 +51,18 @@ void nunchuk_print_data(struct nunchuk* n)
 
 void nunchuk2pi_init()
 {
-	printf("nunchuk2pi initiated!\n");
+	printf("nunchuk2pi init:\n");
 	
 	signal(SIGTERM, catch_signal);
 	signal(SIGKILL, catch_signal);
 	signal(SIGINT, catch_signal);
 	
 	if(uinput_init() < 0) {
-		printf("Could not open uinput\n");
+		printf("Could not open uinput.\n");
 		exit(EXIT_FAILURE);
 	}
 	if(nunchuk_init() < 0) {
-		printf("Could not init nunchuk\n");
+		printf("Could not init nunchuk.\n");
 		exit(EXIT_FAILURE);
 	}
 }
