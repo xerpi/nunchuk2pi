@@ -39,6 +39,13 @@ static int nunchuk_request_data()
 	return 1;
 }
 
+static void nunchuk_try_callback(int read_succes)
+{
+	if(nuncuk_read_callback_func) {
+		nuncuk_read_callback_func(read_succes);
+	}	
+}
+
 static int nunchuk_parse_data(struct nunchuk* n)
 {
 	n->X = nunchuk_data_buffer[0];
@@ -56,7 +63,7 @@ void* nunchuk_loop(void* n)
 		if(nunchuk_read_data(n) > 0) {
 			usleep(nunchuk_request_period);
 		} else {
-			while(nunchuk_init_nunchuk() < 0) {
+			while((nunchuk_init_nunchuk() < 0) && nunchuk_run_thread) {
 				usleep(NUNCHUK_REINIT_DELAY);
 			}
 		}
@@ -142,14 +149,12 @@ int nunchuk_read_data(struct nunchuk* n)
 	
 	if(ret < 0) {
 		printf("error reading data I2C_RDWR\n");
-		memset(n, 0, sizeof(struct nunchuk));
+		nunchuk_try_callback(0);
 		return -1;
 	} else {
 		nunchuk_request_data();	
 		nunchuk_parse_data(n);
-		if(nuncuk_read_callback_func) {
-			nuncuk_read_callback_func(n);
-		}
+		nunchuk_try_callback(1);
 	}
 
 	/*int i;
@@ -161,10 +166,14 @@ int nunchuk_read_data(struct nunchuk* n)
 
 void nunchuk_set_request_freq(int new_freq)
 {
-	if(new_freq > NUNCHUK_REQ_MIN_FREQ && NUNCHUK_REQ_MAX_FREQ) {
+	if(new_freq < NUNCHUK_REQ_MIN_FREQ) {
+		nunchuk_request_freq = NUNCHUK_REQ_MIN_FREQ;
+	} else if(new_freq > NUNCHUK_REQ_MIN_FREQ) {
+		nunchuk_request_freq = NUNCHUK_REQ_MAX_FREQ;
+	} else {
 		nunchuk_request_freq = new_freq;
-		nunchuk_calculate_request_period();
 	}
+	nunchuk_calculate_request_period();
 }
 
 int nunchuk_get_request_freq()
@@ -181,6 +190,7 @@ int nunchuk_exit()
 {
 	nunchuk_return_not_initiated();
 	nunchuk_run_thread = 0;
+	pthread_cancel(nunchuk_thread);
 	pthread_join(nunchuk_thread, NULL);
 	if(nunchuk_ioctl_data.msgs == NULL) {
 		free(nunchuk_ioctl_data.msgs);

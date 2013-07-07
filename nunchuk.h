@@ -20,14 +20,14 @@
 #define NUNCHUK_REQ_MIN_FREQ 1
 #define NUNCHUK_REQ_MAX_FREQ 1000
 #define NUNCHUK_THREAD_ARG   "Nunchuk thread"
-#define NUNCHUK_REINIT_DELAY 100 * 1000
+#define NUNCHUK_REINIT_DELAY 500 * 1000
 
 struct nunchuk {
 	uint8_t X, Y, Z, C;
 	uint16_t aX, aY, aZ;
 };
 
-typedef void (*nuncuk_read_callback)(void*);
+typedef void (*nuncuk_read_callback)(int);
 
 
 int nunchuk_init_nunchuk();

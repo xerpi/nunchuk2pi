@@ -62,7 +62,9 @@ int uinput_init()
     for(i = 0; i < KEY_MAX; i++) {
         ioctl(ui_fd, UI_SET_KEYBIT, i);
     }
-
+	
+	ioctl(ui_fd, UI_SET_KEYBIT, BTN_LEFT);
+	ioctl(ui_fd, UI_SET_KEYBIT, BTN_RIGHT);
     ioctl(ui_fd, UI_SET_EVBIT, EV_REL);
     ioctl(ui_fd, UI_SET_RELBIT, REL_X);
     ioctl(ui_fd, UI_SET_RELBIT, REL_Y);

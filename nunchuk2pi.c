@@ -13,13 +13,13 @@
 #include "uinput.h"
 #include "nunchuk.h"
 
-struct nunchuk n;
+struct nunchuk nun, last_nun;
 
 void nunchuk2pi_init();
 void nunchuk2pi_exit();
 void catch_signal(int signal);
 void nunchuk_print_data(struct nunchuk* n);
-void read_callback(void *p);
+void read_callback(int read_success);
 
 
 int main(int argc, char *argv[])
@@ -35,9 +35,32 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-void read_callback(void *p)
+void read_callback(int read_success)
 {
-	nunchuk_print_data(p);
+	if(read_success) {
+		//nunchuk_print_data(&nun);
+		int x = nun.X-128;
+		int y = -(nun.Y-128);
+		if(abs(x) < 15) x = 0;
+		if(abs(y) < 15) y = 0;
+		x = (int)((float)x/7.5f);
+		y = (int)((float)y/7.5f);
+		send_rel_mouse(x, y);
+		if(nun.C && !last_nun.C) {
+			send_key_press(BTN_LEFT);
+		}
+		if(!nun.C && last_nun.C) {
+			send_key_release(BTN_LEFT);
+		}
+		if(nun.Z && !last_nun.Z) {
+			send_key_press(BTN_RIGHT);
+		}
+		if(!nun.Z && last_nun.Z) {
+			send_key_release(BTN_RIGHT);
+		}
+		send_report();
+		last_nun = nun;
+	}
 }
 
 void nunchuk_print_data(struct nunchuk* n)
@@ -58,7 +81,7 @@ void nunchuk2pi_init()
 		printf("Could not open uinput.\n");
 		exit(EXIT_FAILURE);
 	}
-	if(nunchuk_init(&n) < 0) {
+	if(nunchuk_init(&nun) < 0) {
 		printf("Could not init nunchuk.\n");
 		exit(EXIT_FAILURE);
 	}
