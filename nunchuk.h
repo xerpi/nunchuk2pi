@@ -17,9 +17,10 @@
 
 #define NUNCHUK_ADDRESS      0x52
 #define NUNCHUK_DATA_LENGTH  6
-#define NUNCHUK_REQ_MIN_FREQ 0
-#define NUNCHUK_REQ_MAX_FREQ 10000
+#define NUNCHUK_REQ_MIN_FREQ 1
+#define NUNCHUK_REQ_MAX_FREQ 1000
 #define NUNCHUK_THREAD_ARG   "Nunchuk thread"
+#define NUNCHUK_REINIT_DELAY 100 * 1000
 
 struct nunchuk {
 	uint8_t X, Y, Z, C;

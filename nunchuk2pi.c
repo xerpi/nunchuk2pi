@@ -37,7 +37,6 @@ int main(int argc, char *argv[])
 
 void read_callback(void *p)
 {
-	printf("CALLBACK!\n");
 	nunchuk_print_data(p);
 }
 

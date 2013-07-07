@@ -15,6 +15,7 @@ static int nunchuk_fd = -1;
 static int nunchuk_initiated = 0;
 static int nunchuk_request_freq = 100;
 static int nunchuk_request_period = 0;
+static int nunchuk_run_thread     = 0;
 static nuncuk_read_callback nuncuk_read_callback_func = NULL;
 static pthread_t nunchuk_thread;
 
@@ -51,15 +52,16 @@ static int nunchuk_parse_data(struct nunchuk* n)
 
 void* nunchuk_loop(void* n)
 {
-	while(1) {
+	while(nunchuk_run_thread) {
 		if(nunchuk_read_data(n) > 0) {
 			usleep(nunchuk_request_period);
 		} else {
 			while(nunchuk_init_nunchuk() < 0) {
-				usleep(nunchuk_request_period);
+				usleep(NUNCHUK_REINIT_DELAY);
 			}
 		}
 	}
+	return n;
 }
 
 int nunchuk_init_nunchuk()
@@ -69,7 +71,7 @@ int nunchuk_init_nunchuk()
 	if( (i2c_smbus_write_byte_data(nunchuk_fd, 0xF0, 0x55) < 0) ||
 		(i2c_smbus_write_byte_data(nunchuk_fd, 0xFB, 0x00) < 0))
 	{
-		printf("error initializing nunchuk\n");
+		printf("error initializing nunchuk...reconnect it again please\n");
 		return -1;	
 	}
 	return 1;
@@ -118,8 +120,8 @@ int nunchuk_init(struct nunchuk* n)
 
 	memset(nunchuk_data_buffer, 0, sizeof(uint8_t) * NUNCHUK_DATA_LENGTH);
 	
+	nunchuk_run_thread = 1;	
 	pthread_create(&nunchuk_thread, NULL, nunchuk_loop, (void*) n);
-	
 	
 	nunchuk_initiated = 1;
 	usleep(100);
@@ -178,13 +180,14 @@ void nunchuk_set_read_callback(nuncuk_read_callback func)
 int nunchuk_exit()
 {
 	nunchuk_return_not_initiated();
+	nunchuk_run_thread = 0;
+	pthread_join(nunchuk_thread, NULL);
 	if(nunchuk_ioctl_data.msgs == NULL) {
 		free(nunchuk_ioctl_data.msgs);
 	}
 	if(nunchuk_fd > 0) {
 		close(nunchuk_fd);
 	}
-	pthread_kill(nunchuk_thread, SIGTERM);
 	nunchuk_initiated = 0;
 	return 1;
 }
