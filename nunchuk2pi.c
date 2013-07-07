@@ -13,41 +13,39 @@
 #include "uinput.h"
 #include "nunchuk.h"
 
+struct nunchuk n;
+
 void nunchuk2pi_init();
 void nunchuk2pi_exit();
 void catch_signal(int signal);
 void nunchuk_print_data(struct nunchuk* n);
+void read_callback(void *p);
 
 
 int main(int argc, char *argv[])
 {
 	nunchuk2pi_init();
 	nunchuk_init_nunchuk();
-	struct nunchuk n;
 
 	while(1) {
-		if(nunchuk_read_data(&n) > 0) {
-			usleep(100);
-			nunchuk_print_data(&n);
-			usleep(100);
-		} else {
-			while(nunchuk_init_nunchuk() < 0) {
-				usleep(100);
-			}
-		}
+		usleep(1000 * 1000);
 	}
 	
 	nunchuk2pi_exit();
 	return 0;
 }
 
+void read_callback(void *p)
+{
+	printf("CALLBACK!\n");
+	nunchuk_print_data(p);
+}
 
 void nunchuk_print_data(struct nunchuk* n)
 {
  	printf("joyX: %d  joyY: %d  Z: %d  C: %d\n", n->X, n->Y, n->Z, n->C);
  	printf("aX: %d  aY: %d  aZ: %d\n", n->aX, n->aY, n->aZ);
 }
-
 
 void nunchuk2pi_init()
 {
@@ -61,10 +59,11 @@ void nunchuk2pi_init()
 		printf("Could not open uinput.\n");
 		exit(EXIT_FAILURE);
 	}
-	if(nunchuk_init() < 0) {
+	if(nunchuk_init(&n) < 0) {
 		printf("Could not init nunchuk.\n");
 		exit(EXIT_FAILURE);
 	}
+	nunchuk_set_read_callback(read_callback);
 }
 
 void nunchuk2pi_exit()

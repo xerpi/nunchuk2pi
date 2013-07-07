@@ -13,24 +13,19 @@ static uint8_t nunchuk_data_buffer[6];
 static struct i2c_rdwr_ioctl_data nunchuk_ioctl_data;
 static int nunchuk_fd = -1;
 static int nunchuk_initiated = 0;
+static int nunchuk_request_freq = 100;
+static int nunchuk_request_period = 0;
+static nuncuk_read_callback nuncuk_read_callback_func = NULL;
+static pthread_t nunchuk_thread;
 
 #define nunchuk_return_not_initiated() \
 	if(!nunchuk_initiated) {    \
 		return -2;             \
-	}
+	}	
 
-
-int nunchuk_init_nunchuk()
+static int nunchuk_calculate_request_period()
 {
-	nunchuk_return_not_initiated();
-
-	if( (i2c_smbus_write_byte_data(nunchuk_fd, 0xF0, 0x55) < 0) ||
-		(i2c_smbus_write_byte_data(nunchuk_fd, 0xFB, 0x00) < 0))
-	{
-		printf("error initializing nunchuk\n");
-		return -1;	
-	}
-	return 1;
+	nunchuk_request_period = (int)((1000.0f * 1000)/(float)nunchuk_request_freq);
 }
 
 static int nunchuk_request_data()
@@ -54,11 +49,39 @@ static int nunchuk_parse_data(struct nunchuk* n)
 	n->aZ = (((nunchuk_data_buffer[5]>>6) & 0b11) | ((int)nunchuk_data_buffer[4])<<2);
 }
 
-int nunchuk_init()
+void* nunchuk_loop(void* n)
+{
+	while(1) {
+		if(nunchuk_read_data(n) > 0) {
+			usleep(nunchuk_request_period);
+		} else {
+			while(nunchuk_init_nunchuk() < 0) {
+				usleep(nunchuk_request_period);
+			}
+		}
+	}
+}
+
+int nunchuk_init_nunchuk()
+{
+	nunchuk_return_not_initiated();
+
+	if( (i2c_smbus_write_byte_data(nunchuk_fd, 0xF0, 0x55) < 0) ||
+		(i2c_smbus_write_byte_data(nunchuk_fd, 0xFB, 0x00) < 0))
+	{
+		printf("error initializing nunchuk\n");
+		return -1;	
+	}
+	return 1;
+}
+
+int nunchuk_init(struct nunchuk* n)
 {
 	if(nunchuk_initiated) {
 		return 2;
 	}
+	
+	nunchuk_calculate_request_period();
 	
 	int i = 0;
 	for(; nunchuk_adapter[i]; i++) {
@@ -95,8 +118,10 @@ int nunchuk_init()
 
 	memset(nunchuk_data_buffer, 0, sizeof(uint8_t) * NUNCHUK_DATA_LENGTH);
 	
-	nunchuk_initiated = 1;
+	pthread_create(&nunchuk_thread, NULL, nunchuk_loop, (void*) n);
 	
+	
+	nunchuk_initiated = 1;
 	usleep(100);
 	return 1;
 }
@@ -120,6 +145,9 @@ int nunchuk_read_data(struct nunchuk* n)
 	} else {
 		nunchuk_request_data();	
 		nunchuk_parse_data(n);
+		if(nuncuk_read_callback_func) {
+			nuncuk_read_callback_func(n);
+		}
 	}
 
 	/*int i;
@@ -127,6 +155,24 @@ int nunchuk_read_data(struct nunchuk* n)
 		nunchuk_buffer[i] = i2c_smbus_read_byte(fd);*/
 
 	return 1;	
+}
+
+void nunchuk_set_request_freq(int new_freq)
+{
+	if(new_freq > NUNCHUK_REQ_MIN_FREQ && NUNCHUK_REQ_MAX_FREQ) {
+		nunchuk_request_freq = new_freq;
+		nunchuk_calculate_request_period();
+	}
+}
+
+int nunchuk_get_request_freq()
+{
+	return nunchuk_request_freq;
+}
+
+void nunchuk_set_read_callback(nuncuk_read_callback func)
+{
+	nuncuk_read_callback_func = func;
 }
 
 int nunchuk_exit()
@@ -138,6 +184,7 @@ int nunchuk_exit()
 	if(nunchuk_fd > 0) {
 		close(nunchuk_fd);
 	}
+	pthread_kill(nunchuk_thread, SIGTERM);
 	nunchuk_initiated = 0;
 	return 1;
 }
